@@ -129,17 +129,17 @@ void EG4Bms::on_modbus_data(const std::vector<uint8_t> &data) {
 }
 
 void EG4Bms::on_status_data_(const std::vector<uint8_t> &data) {
+  const uint8_t *payload = &data[3];  // Skip address, function, byte count
+  size_t byte_count = data[2];
+
   auto get_16bit = [&](size_t i) -> uint16_t {
-    return (uint16_t(data[i]) << 8) | uint16_t(data[i + 1]);
+    return (uint16_t(payload[i]) << 8) | uint16_t(payload[i + 1]);
   };
 
   auto get_32bit = [&](size_t i) -> uint32_t {
-    return (uint32_t(data[i]) << 24) | (uint32_t(data[i + 1]) << 16) | 
-           (uint32_t(data[i + 2]) << 8) | uint32_t(data[i + 3]);
+    return (uint32_t(payload[i]) << 24) | (uint32_t(payload[i + 1]) << 16) | 
+           (uint32_t(payload[i + 2]) << 8) | uint32_t(payload[i + 3]);
   };
-
-  const uint8_t *payload = &data[3];  // Skip address, function, byte count
-  size_t byte_count = data[2];
 
   ESP_LOGV(TAG, "Processing %d bytes of data", byte_count);
 
@@ -148,11 +148,13 @@ void EG4Bms::on_status_data_(const std::vector<uint8_t> &data) {
     // Total voltage (register 0x0000) - 10mV units
     float total_voltage = get_16bit(0) * 0.01f;
     this->publish_state_(this->total_voltage_sensor_, total_voltage);
+    ESP_LOGD(TAG, "Voltage: raw=%d, converted=%.2f", get_16bit(0), total_voltage);
 
     // Current (register 0x0001) - 10mA units, signed
     int16_t current_raw = (int16_t) get_16bit(2);
     float current = current_raw * 0.01f;
     this->publish_state_(this->current_sensor_, current);
+    ESP_LOGD(TAG, "Current: raw=%d, converted=%.2f", current_raw, current);
 
     // Calculate power
     float power = total_voltage * current;
@@ -214,6 +216,7 @@ void EG4Bms::on_status_data_(const std::vector<uint8_t> &data) {
     // SOC (register 0x0018) - percentage
     uint16_t soc = get_16bit(12);
     this->publish_state_(this->state_of_charge_sensor_, (float) soc);
+    ESP_LOGD(TAG, "SOC: raw=%d, converted=%.2f", soc, (float) soc);
 
     // Status (register 0x0019)
     uint16_t status = get_16bit(14);
