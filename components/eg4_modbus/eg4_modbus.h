@@ -2,11 +2,19 @@
 
 #include "esphome/core/component.h"
 #include "esphome/components/uart/uart.h"
+#include <queue>
 
 namespace esphome {
 namespace eg4_modbus {
 
 class EG4ModbusDevice;
+
+struct ModbusRequest {
+  uint8_t address;
+  uint8_t function;
+  uint16_t start_register;
+  uint16_t num_registers;
+};
 
 class EG4Modbus : public uart::UARTDevice, public Component {
  public:
@@ -27,10 +35,15 @@ class EG4Modbus : public uart::UARTDevice, public Component {
   GPIOPin *flow_control_pin_{nullptr};
 
   bool parse_modbus_byte_(uint8_t byte);
+  void send_next_request_();
+  
   std::vector<uint8_t> rx_buffer_;
   uint32_t last_modbus_byte_{0};
   uint32_t last_send_{0};
   std::vector<EG4ModbusDevice *> devices_;
+  
+  std::queue<ModbusRequest> request_queue_;
+  bool waiting_for_response_{false};
 };
 
 uint16_t crc16_modbus(const uint8_t *data, uint16_t len);

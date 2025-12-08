@@ -33,10 +33,24 @@ void EG4Modbus::loop() {
     }
   }
 
-  // Check for timeout
-  if (!this->rx_buffer_.empty() && (now - this->last_modbus_byte_ > EG4_MODBUS_RESPONSE_TIMEOUT)) {
+  // Check for timeout on current response
+  if (this->waiting_for_response_ && !this->rx_buffer_.empty() && 
+      (now - this->last_modbus_byte_ > EG4_MODBUS_RESPONSE_TIMEOUT)) {
     ESP_LOGW(TAG, "Modbus response timeout");
     this->rx_buffer_.clear();
+    this->waiting_for_response_ = false;
+  }
+
+  // Check for complete timeout (no response at all)
+  if (this->waiting_for_response_ && this->rx_buffer_.empty() && 
+      (now - this->last_send_ > EG4_MODBUS_RESPONSE_TIMEOUT)) {
+    ESP_LOGW(TAG, "No response received");
+    this->waiting_for_response_ = false;
+  }
+
+  // Send next request if not waiting for a response
+  if (!this->waiting_for_response_) {
+    this->send_next_request_();
   }
 }
 
@@ -63,13 +77,33 @@ uint16_t crc16_modbus(const uint8_t *data, uint16_t len) {
 }
 
 void EG4Modbus::send(uint8_t address, uint8_t function, uint16_t start_register, uint16_t num_registers) {
+  // Add request to queue instead of sending immediately
+  ModbusRequest request;
+  request.address = address;
+  request.function = function;
+  request.start_register = start_register;
+  request.num_registers = num_registers;
+  
+  this->request_queue_.push(request);
+  
+  ESP_LOGV(TAG, "Queued request for address 0x%02X, queue size: %d", address, this->request_queue_.size());
+}
+
+void EG4Modbus::send_next_request_() {
+  if (this->request_queue_.empty() || this->waiting_for_response_) {
+    return;
+  }
+
+  ModbusRequest request = this->request_queue_.front();
+  this->request_queue_.pop();
+
   uint8_t frame[8];
-  frame[0] = address;
-  frame[1] = function;
-  frame[2] = start_register >> 8;
-  frame[3] = start_register & 0xFF;
-  frame[4] = num_registers >> 8;
-  frame[5] = num_registers & 0xFF;
+  frame[0] = request.address;
+  frame[1] = request.function;
+  frame[2] = request.start_register >> 8;
+  frame[3] = request.start_register & 0xFF;
+  frame[4] = request.num_registers >> 8;
+  frame[5] = request.num_registers & 0xFF;
 
   uint16_t crc = crc16_modbus(frame, 6);
   frame[6] = crc & 0xFF;
@@ -88,6 +122,7 @@ void EG4Modbus::send(uint8_t address, uint8_t function, uint16_t start_register,
 
   ESP_LOGV(TAG, "Sent: %s", format_hex_pretty(frame, 8).c_str());
   this->last_send_ = millis();
+  this->waiting_for_response_ = true;
 }
 
 bool EG4Modbus::parse_modbus_byte_(uint8_t byte) {
@@ -148,6 +183,7 @@ bool EG4Modbus::parse_modbus_byte_(uint8_t byte) {
     }
 
     this->rx_buffer_.clear();
+    this->waiting_for_response_ = false;  // Ready for next request
     return true;
   }
 
