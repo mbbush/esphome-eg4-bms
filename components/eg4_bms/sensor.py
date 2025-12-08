@@ -178,6 +178,7 @@ CONFIG_SCHEMA = EG4_BMS_COMPONENT_SCHEMA.extend(
             unit_of_measurement=UNIT_PERCENT,
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
+            icon="mdi:battery-70",
         ),
         cv.Optional(CONF_STATE_OF_HEALTH): sensor.sensor_schema(
             unit_of_measurement=UNIT_PERCENT,
