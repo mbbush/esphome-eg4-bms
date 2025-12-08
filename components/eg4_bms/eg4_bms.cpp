@@ -10,29 +10,28 @@ static const char *const TAG = "eg4_bms";
 static const uint8_t FUNCTION_READ_HOLDING = 0x03;
 static const uint8_t MAX_NO_RESPONSE_COUNT = 5;
 
-// Register addresses (from EG4 protocol documentation)
+// Register addresses (from working YamBMS modbus_controller implementation)
 static const uint16_t REG_VOLTAGE = 0x0000;          // Total voltage (10mV)
 static const uint16_t REG_CURRENT = 0x0001;          // Current (10mA, signed)
 static const uint16_t REG_CELL_VOLTAGE = 0x0002;     // Cell voltages start (mV, 16 cells)
-static const uint16_t REG_TEMP_PCB = 0x0018;         // PCB temperature (°C)
-static const uint16_t REG_TEMP_AVG = 0x0019;         // Average temperature (°C)
-static const uint16_t REG_TEMP_MAX = 0x001A;         // Max temperature (°C)
-static const uint16_t REG_CAP_REMAINING = 0x001B;    // Remaining capacity
-static const uint16_t REG_MAX_CHARGE_CURRENT = 0x001C;  // Max charging current
-static const uint16_t REG_SOH = 0x001D;              // State of health (0-100%)
-static const uint16_t REG_SOC = 0x001E;              // State of charge (0-100%)
-static const uint16_t REG_STATUS = 0x001F;           // Status
-static const uint16_t REG_WARNING = 0x0020;          // Warnings
-static const uint16_t REG_PROTECTION = 0x0021;       // Protection status
-static const uint16_t REG_ERROR = 0x0022;            // Error code
-static const uint16_t REG_CYCLE_COUNT = 0x0023;      // Cycle counts (4 bytes)
-static const uint16_t REG_FULL_CAPACITY = 0x0025;    // Full capacity (4 bytes)
-static const uint16_t REG_TEMPS = 0x0029;            // Temperature sensors (6 bytes)
-static const uint16_t REG_CELL_NUM = 0x002C;         // Cell count
-static const uint16_t REG_DESIGNED_CAPACITY = 0x002D;  // Designed capacity
-static const uint16_t REG_MODEL = 0x0105;            // Model (24 bytes)
-static const uint16_t REG_FW_VERSION = 0x0117;       // Firmware version (6 bytes)
-static const uint16_t REG_SERIAL_NO = 0x0120;        // Serial number (16 bytes)
+static const uint16_t REG_TEMP_PCB = 0x0012;         // PCB/MOSFET temperature (°C, signed)
+static const uint16_t REG_TEMP_AVG = 0x0013;         // Average temperature (°C, signed)
+static const uint16_t REG_TEMP_MAX = 0x0014;         // Max temperature (°C, signed)
+static const uint16_t REG_CAP_REMAINING = 0x0015;    // Remaining capacity (Ah)
+static const uint16_t REG_MAX_CHARGE_CURRENT = 0x0016;  // Max charging current (A)
+static const uint16_t REG_SOH = 0x0017;              // State of health (0-100%)
+static const uint16_t REG_SOC = 0x0018;              // State of charge (0-100%)
+static const uint16_t REG_STATUS = 0x0019;           // Status
+static const uint16_t REG_WARNING = 0x001A;          // Warnings
+static const uint16_t REG_PROTECTION = 0x001B;       // Protection status
+static const uint16_t REG_ERROR = 0x001C;            // Error code
+static const uint16_t REG_CYCLE_COUNT = 0x001D;      // Cycle counts (4 bytes)
+static const uint16_t REG_TEMPS = 0x0021;            // Temperature sensors 1-6 (6 bytes, packed)
+static const uint16_t REG_BALANCING = 0x0026;        // Balancing status
+static const uint16_t REG_FULL_CAPACITY = 0x0025;    // Full capacity (0.1 Ah units)
+static const uint16_t REG_MODEL = 0x0069;            // Model (22 bytes)
+static const uint16_t REG_FW_VERSION = 0x0075;       // Firmware version (6 bytes)
+static const uint16_t REG_SERIAL_NO = 0x0078;        // Serial number (16 bytes)
 
 void EG4Bms::dump_config() {
   ESP_LOGCONFIG(TAG, "EG4 BMS:");
@@ -62,34 +61,35 @@ void EG4Bms::update() {
   // Request different register blocks in sequence
   switch (this->request_step_) {
     case 0:
-      // Request main data block (voltage, current, cell voltages, temps, SOC, status, warnings, etc.)
-      this->send(FUNCTION_READ_HOLDING, REG_VOLTAGE, 0x30);  // Read 48 registers
+      // Request main data block (voltage, current, cell voltages)
+      this->send(FUNCTION_READ_HOLDING, REG_VOLTAGE, 0x12);  // Read 18 registers (0x00-0x11)
       break;
     case 1:
-      // Request cycle count and capacities (4-byte values)
-      this->send(FUNCTION_READ_HOLDING, REG_CYCLE_COUNT, 0x06);  // Read 6 registers
+      // Request temps, capacities, SOC, SOH, status, warnings, errors
+      this->send(FUNCTION_READ_HOLDING, REG_TEMP_PCB, 0x15);  // Read 21 registers (0x12-0x26)
       break;
     case 2:
-      // Request model info (every 10th update to reduce traffic)
-      if ((this->request_step_ % 30) == 0) {
-        this->send(FUNCTION_READ_HOLDING, REG_MODEL, 0x0C);  // Read 12 registers (24 bytes)
+      // Request model info (every 30th update to reduce traffic)
+      if ((this->update_counter_ % 30) == 0) {
+        this->send(FUNCTION_READ_HOLDING, REG_MODEL, 0x0B);  // Read 11 registers (22 bytes)
       }
       break;
     case 3:
-      // Request firmware version (every 10th update)
-      if ((this->request_step_ % 30) == 0) {
+      // Request firmware version (every 30th update)
+      if ((this->update_counter_ % 30) == 0) {
         this->send(FUNCTION_READ_HOLDING, REG_FW_VERSION, 0x03);  // Read 3 registers (6 bytes)
       }
       break;
     case 4:
-      // Request serial number (every 10th update)
-      if ((this->request_step_ % 30) == 0) {
+      // Request serial number (every 30th update)
+      if ((this->update_counter_ % 30) == 0) {
         this->send(FUNCTION_READ_HOLDING, REG_SERIAL_NO, 0x08);  // Read 8 registers (16 bytes)
       }
       break;
   }
 
   this->request_step_ = (this->request_step_ + 1) % 5;
+  this->update_counter_++;
 }
 
 void EG4Bms::on_modbus_data(const std::vector<uint8_t> &data) {
@@ -144,7 +144,7 @@ void EG4Bms::on_status_data_(const std::vector<uint8_t> &data) {
   ESP_LOGV(TAG, "Processing %d bytes of data", byte_count);
 
   // Determine which register block this is based on byte count
-  if (byte_count == 0x60) {  // 96 bytes = 48 registers (main data block)
+  if (byte_count == 0x24) {  // 36 bytes = 18 registers (voltage, current, cells)
     // Total voltage (register 0x0000) - 10mV units
     float total_voltage = get_16bit(0) * 0.01f;
     this->publish_state_(this->total_voltage_sensor_, total_voltage);
@@ -186,33 +186,37 @@ void EG4Bms::on_status_data_(const std::vector<uint8_t> &data) {
       this->publish_state_(this->average_cell_voltage_sensor_, sum_cell_voltage / valid_cells);
     }
 
-    // Temperatures (registers 0x0018-0x001A) - °C, signed
-    int16_t pcb_temp = (int16_t) get_16bit(36);
-    int16_t avg_temp = (int16_t) get_16bit(38);
-    int16_t max_temp = (int16_t) get_16bit(40);
-    
+  } else if (byte_count == 0x2A) {  // 42 bytes = 21 registers (temps, SOC, SOH, status, etc.)
+    // PCB/MOSFET temperature (register 0x0012) - °C, signed
+    int16_t pcb_temp = (int16_t) get_16bit(0);
     this->publish_state_(this->pcb_temperature_sensor_, (float) pcb_temp);
+    
+    // Average temperature (register 0x0013) - °C, signed
+    int16_t avg_temp = (int16_t) get_16bit(2);
     this->publish_state_(this->avg_temperature_sensor_, (float) avg_temp);
+    
+    // Max temperature (register 0x0014) - °C, signed
+    int16_t max_temp = (int16_t) get_16bit(4);
     this->publish_state_(this->max_temperature_sensor_, (float) max_temp);
 
-    // Remaining capacity (register 0x001B)
-    uint16_t remaining_cap = get_16bit(42);
+    // Remaining capacity (register 0x0015) - Ah
+    uint16_t remaining_cap = get_16bit(6);
     this->publish_state_(this->remaining_capacity_sensor_, (float) remaining_cap);
 
-    // Max charge current (register 0x001C)
-    uint16_t max_charge_current = get_16bit(44);
+    // Max charge current (register 0x0016) - A
+    uint16_t max_charge_current = get_16bit(8);
     this->publish_state_(this->max_charge_current_sensor_, (float) max_charge_current);
 
-    // SOH (register 0x001D) - percentage
-    uint16_t soh = get_16bit(46);
+    // SOH (register 0x0017) - percentage
+    uint16_t soh = get_16bit(10);
     this->publish_state_(this->state_of_health_sensor_, (float) soh);
 
-    // SOC (register 0x001E) - percentage
-    uint16_t soc = get_16bit(48);
+    // SOC (register 0x0018) - percentage
+    uint16_t soc = get_16bit(12);
     this->publish_state_(this->state_of_charge_sensor_, (float) soc);
 
-    // Status (register 0x001F)
-    uint16_t status = get_16bit(50);
+    // Status (register 0x0019)
+    uint16_t status = get_16bit(14);
     this->publish_state_(this->status_text_sensor_, this->decode_status_(status));
     
     // Decode heating, charging, discharging from status
@@ -224,29 +228,39 @@ void EG4Bms::on_status_data_(const std::vector<uint8_t> &data) {
     this->publish_state_(this->charging_binary_sensor_, charging);
     this->publish_state_(this->discharging_binary_sensor_, discharging);
 
-    // Warnings (register 0x0020)
-    uint16_t warnings = get_16bit(52);
+    // Warnings (register 0x001A)
+    uint16_t warnings = get_16bit(16);
     this->publish_state_(this->warnings_text_sensor_, this->decode_warnings_(warnings));
 
-    // Protection (register 0x0021)
-    uint16_t protection = get_16bit(54);
+    // Protection (register 0x001B)
+    uint16_t protection = get_16bit(18);
     this->publish_state_(this->protection_text_sensor_, this->decode_protection_(protection));
 
-    // Error (register 0x0022)
-    uint16_t error = get_16bit(56);
+    // Error (register 0x001C)
+    uint16_t error = get_16bit(20);
     this->publish_state_(this->error_text_sensor_, this->decode_error_(error));
 
-  } else if (byte_count == 0x0C) {  // 12 bytes = 6 registers (cycle count and capacities)
-    // Cycle count (registers 0x0023-0x0024) - 32-bit
-    uint32_t cycle_count = get_32bit(0);
+    // Cycle count (registers 0x001D-0x001E) - 32-bit
+    uint32_t cycle_count = get_32bit(22);
     this->publish_state_(this->cycle_count_sensor_, (float) cycle_count);
 
-    // Full capacity (registers 0x0025-0x0026) - 32-bit, mAh units
-    uint32_t full_capacity = get_32bit(4);
-    this->publish_state_(this->full_capacity_sensor_, full_capacity / 3600.0f);  // Convert to Ah
+    // Temperature sensors 1-6 (registers 0x0021-0x0023) - packed as bytes
+    // Each register contains 2 temperature values in its high and low bytes
+    if (byte_count >= 0x2A) {  // Make sure we have enough data
+      this->publish_state_(this->cells_[0].temp_sensor_, (float) payload[30]);  // Reg 0x0021 high byte
+      this->publish_state_(this->cells_[1].temp_sensor_, (float) payload[31]);  // Reg 0x0021 low byte
+      this->publish_state_(this->cells_[2].temp_sensor_, (float) payload[32]);  // Reg 0x0022 high byte
+      this->publish_state_(this->cells_[3].temp_sensor_, (float) payload[33]);  // Reg 0x0022 low byte
+      this->publish_state_(this->cells_[4].temp_sensor_, (float) payload[34]);  // Reg 0x0023 high byte
+      this->publish_state_(this->cells_[5].temp_sensor_, (float) payload[35]);  // Reg 0x0023 low byte
+    }
 
-  } else if (byte_count == 0x18) {  // 24 bytes = 12 registers (model)
-    std::string model((char *) payload, 24);
+    // Full capacity (register 0x0025) - 0.1 Ah units
+    uint16_t full_capacity = get_16bit(26);
+    this->publish_state_(this->full_capacity_sensor_, full_capacity * 0.1f);
+
+  } else if (byte_count == 0x16) {  // 22 bytes = 11 registers (model)
+    std::string model((char *) payload, 22);
     // Trim null characters and whitespace
     model.erase(model.find_last_not_of(" \0") + 1);
     this->publish_state_(this->model_text_sensor_, model);
