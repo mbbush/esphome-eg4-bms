@@ -148,13 +148,11 @@ void EG4Bms::on_status_data_(const std::vector<uint8_t> &data) {
     // Total voltage (register 0x0000) - 10mV units
     float total_voltage = get_16bit(0) * 0.01f;
     this->publish_state_(this->total_voltage_sensor_, total_voltage);
-    ESP_LOGD(TAG, "Voltage: raw=%d, converted=%.2f", get_16bit(0), total_voltage);
 
     // Current (register 0x0001) - 10mA units, signed
     int16_t current_raw = (int16_t) get_16bit(2);
     float current = current_raw * 0.01f;
     this->publish_state_(this->current_sensor_, current);
-    ESP_LOGD(TAG, "Current: raw=%d, converted=%.2f", current_raw, current);
 
     // Calculate power
     float power = total_voltage * current;
@@ -216,20 +214,14 @@ void EG4Bms::on_status_data_(const std::vector<uint8_t> &data) {
     // SOC (register 0x0018) - percentage
     uint16_t soc = get_16bit(12);
     this->publish_state_(this->state_of_charge_sensor_, (float) soc);
-    ESP_LOGD(TAG, "SOC: raw=%d, converted=%.2f", soc, (float) soc);
 
     // Status (register 0x0019)
     uint16_t status = get_16bit(14);
     this->publish_state_(this->status_text_sensor_, this->decode_status_(status));
     
-    // Decode heating, charging, discharging from status
+    // Decode heating from status
     bool heating = (status & 0x8000) != 0;
-    bool charging = (status & 0x000F) == 0x0001;
-    bool discharging = (status & 0x000F) == 0x0002;
-    
     this->publish_state_(this->heating_binary_sensor_, heating);
-    this->publish_state_(this->charging_binary_sensor_, charging);
-    this->publish_state_(this->discharging_binary_sensor_, discharging);
 
     // Warnings (register 0x001A)
     uint16_t warnings = get_16bit(16);
@@ -242,6 +234,14 @@ void EG4Bms::on_status_data_(const std::vector<uint8_t> &data) {
     // Error (register 0x001C)
     uint16_t error = get_16bit(20);
     this->publish_state_(this->error_text_sensor_, this->decode_error_(error));
+
+    // Charging/discharging allowed based on protection status
+    // If no protection events are active, charging and discharging are allowed
+    bool charging_allowed = (protection == 0) && (error == 0);
+    bool discharging_allowed = (protection == 0) && (error == 0);
+    
+    this->publish_state_(this->charging_binary_sensor_, charging_allowed);
+    this->publish_state_(this->discharging_binary_sensor_, discharging_allowed);
 
     // Cycle count (registers 0x001D-0x001E) - 32-bit
     uint32_t cycle_count = get_32bit(22);
