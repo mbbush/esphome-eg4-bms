@@ -93,8 +93,6 @@ void EG4Bms::update() {
 }
 
 void EG4Bms::on_modbus_data(const std::vector<uint8_t> &data) {
-  this->reset_online_status_tracker_();
-
   if (data.size() < 5) {
     ESP_LOGW(TAG, "Invalid Modbus response length: %d", data.size());
     return;
@@ -103,14 +101,18 @@ void EG4Bms::on_modbus_data(const std::vector<uint8_t> &data) {
   uint8_t address = data[0];
   uint8_t function = data[1];
 
+  // Check if this response is for this device
+  if (address != this->address_) {
+    return;  // Not for this device
+  }
+
+  // Reset the no-response counter since we got a valid response for this address
+  this->reset_online_status_tracker_();
+
   // Check for error response
   if ((function & 0x80) != 0) {
     ESP_LOGW(TAG, "Modbus error response: 0x%02X", data[2]);
     return;
-  }
-
-  if (address != this->address_) {
-    return;  // Not for this device
   }
 
   if (function != FUNCTION_READ_HOLDING) {
@@ -119,6 +121,7 @@ void EG4Bms::on_modbus_data(const std::vector<uint8_t> &data) {
   }
 
   uint8_t byte_count = data[2];
+  ESP_LOGD(TAG, "Received response: byte_count=%d, data.size()=%d", byte_count, data.size());
   
   if (data.size() < (size_t)(3 + byte_count + 2)) {
     ESP_LOGW(TAG, "Incomplete response");
