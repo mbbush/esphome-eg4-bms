@@ -58,7 +58,7 @@ void EG4Bms::update() {
   this->track_online_status_();
   this->no_response_count_++;
 
-  // Request different register blocks in sequence
+  // Always cycle through the two main register blocks
   switch (this->request_step_) {
     case 0:
       // Request main data block (voltage, current, cell voltages)
@@ -68,27 +68,27 @@ void EG4Bms::update() {
       // Request temps, capacities, SOC, SOH, status, warnings, errors
       this->send(FUNCTION_READ_HOLDING, REG_TEMP_PCB, 0x15);  // Read 21 registers (0x12-0x26)
       break;
-    case 2:
-      // Request model info (every 30th update to reduce traffic)
-      if ((this->update_counter_ % 30) == 0) {
-        this->send(FUNCTION_READ_HOLDING, REG_MODEL, 0x0B);  // Read 11 registers (22 bytes)
-      }
-      break;
-    case 3:
-      // Request firmware version (every 30th update)
-      if ((this->update_counter_ % 30) == 0) {
-        this->send(FUNCTION_READ_HOLDING, REG_FW_VERSION, 0x03);  // Read 3 registers (6 bytes)
-      }
-      break;
-    case 4:
-      // Request serial number (every 30th update)
-      if ((this->update_counter_ % 30) == 0) {
-        this->send(FUNCTION_READ_HOLDING, REG_SERIAL_NO, 0x08);  // Read 8 registers (16 bytes)
-      }
-      break;
   }
 
-  this->request_step_ = (this->request_step_ + 1) % 5;
+  this->request_step_ = (this->request_step_ + 1) % 2;
+
+  // Request text sensor data occasionally (every 30 updates)
+  if ((this->update_counter_ % 30) == 0) {
+    // Cycle through text sensor requests
+    switch (this->text_request_step_) {
+      case 0:
+        this->send(FUNCTION_READ_HOLDING, REG_MODEL, 0x0B);  // Read 11 registers (22 bytes)
+        break;
+      case 1:
+        this->send(FUNCTION_READ_HOLDING, REG_FW_VERSION, 0x03);  // Read 3 registers (6 bytes)
+        break;
+      case 2:
+        this->send(FUNCTION_READ_HOLDING, REG_SERIAL_NO, 0x08);  // Read 8 registers (16 bytes)
+        break;
+    }
+    this->text_request_step_ = (this->text_request_step_ + 1) % 3;
+  }
+
   this->update_counter_++;
 }
 

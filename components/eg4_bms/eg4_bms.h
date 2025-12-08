@@ -139,6 +139,7 @@ class EG4Bms : public PollingComponent, public eg4_modbus::EG4ModbusDevice {
   } temperatures_[6];
 
   uint8_t request_step_{0};
+  uint8_t text_request_step_{0};
   uint8_t no_response_count_{0};
   uint32_t update_counter_{0};
 
