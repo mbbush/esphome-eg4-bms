@@ -225,15 +225,6 @@ void EG4Bms::on_status_data_(const std::vector<uint8_t> &data) {
     // Decode heating from status
     bool heating = (status & 0x8000) != 0;
     this->publish_state_(this->heating_binary_sensor_, heating);
-    
-    // Decode charging/discharging from status (lower 4 bits)
-    // The BMS reports actual charging/discharging state, not just "allowed"
-    uint8_t state = status & 0x000F;
-    bool charging = (state == 0x01) || (state == 0x08);  // Charging or Charging Limited
-    bool discharging = (state == 0x02);  // Discharging
-    
-    this->publish_state_(this->charging_binary_sensor_, charging);
-    this->publish_state_(this->discharging_binary_sensor_, discharging);
 
     // Warnings (register 0x001A)
     uint16_t warnings = get_16bit(16);
@@ -249,6 +240,17 @@ void EG4Bms::on_status_data_(const std::vector<uint8_t> &data) {
     uint16_t error = get_16bit(20);
     this->publish_state_(this->error_text_sensor_, this->decode_error_(error));
     this->publish_state_(this->errors_bitmask_sensor_, (float) error);
+    
+    // Charging/discharging allowed based on protection bits
+    // Charging blocked by: Cell OV (0x0002), Pack OV (0x0001), Charge OC (0x0010), 
+    //                      Charge OT (0x0100), Charge UT (0x0400)
+    // Discharging blocked by: Cell UV (0x0008), Pack UV (0x0004), Discharge OC (0x0020),
+    //                         Discharge OT (0x0200), Discharge UT (0x0800), Discharge SC (0x2000)
+    bool charging_allowed = !(protection & (0x0001 | 0x0002 | 0x0010 | 0x0100 | 0x0400));
+    bool discharging_allowed = !(protection & (0x0004 | 0x0008 | 0x0020 | 0x0200 | 0x0800 | 0x2000));
+    
+    this->publish_state_(this->charging_binary_sensor_, charging_allowed);
+    this->publish_state_(this->discharging_binary_sensor_, discharging_allowed);
 
     // Cycle count (registers 0x001D-0x001E) - 32-bit
     uint32_t cycle_count = get_32bit(22);
