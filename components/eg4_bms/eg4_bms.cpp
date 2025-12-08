@@ -247,12 +247,12 @@ void EG4Bms::on_status_data_(const std::vector<uint8_t> &data) {
     // Temperature sensors 1-6 (registers 0x0021-0x0023) - packed as bytes
     // Each register contains 2 temperature values in its high and low bytes
     if (byte_count >= 0x2A) {  // Make sure we have enough data
-      this->publish_state_(this->cells_[0].temp_sensor_, (float) payload[30]);  // Reg 0x0021 high byte
-      this->publish_state_(this->cells_[1].temp_sensor_, (float) payload[31]);  // Reg 0x0021 low byte
-      this->publish_state_(this->cells_[2].temp_sensor_, (float) payload[32]);  // Reg 0x0022 high byte
-      this->publish_state_(this->cells_[3].temp_sensor_, (float) payload[33]);  // Reg 0x0022 low byte
-      this->publish_state_(this->cells_[4].temp_sensor_, (float) payload[34]);  // Reg 0x0023 high byte
-      this->publish_state_(this->cells_[5].temp_sensor_, (float) payload[35]);  // Reg 0x0023 low byte
+      this->publish_state_(this->temperatures_[0].temperature_sensor_, (float) payload[30]);  // Reg 0x0021 high byte
+      this->publish_state_(this->temperatures_[1].temperature_sensor_, (float) payload[31]);  // Reg 0x0021 low byte
+      this->publish_state_(this->temperatures_[2].temperature_sensor_, (float) payload[32]);  // Reg 0x0022 high byte
+      this->publish_state_(this->temperatures_[3].temperature_sensor_, (float) payload[33]);  // Reg 0x0022 low byte
+      this->publish_state_(this->temperatures_[4].temperature_sensor_, (float) payload[34]);  // Reg 0x0023 high byte
+      this->publish_state_(this->temperatures_[5].temperature_sensor_, (float) payload[35]);  // Reg 0x0023 low byte
     }
 
     // Full capacity (register 0x0025) - 0.1 Ah units
