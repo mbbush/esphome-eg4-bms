@@ -186,7 +186,7 @@ void EG4Bms::on_status_data_(const std::vector<uint8_t> &data) {
       this->publish_state_(this->min_cell_voltage_sensor_, min_cell_voltage);
       this->publish_state_(this->max_cell_voltage_sensor_, max_cell_voltage);
       this->publish_state_(this->delta_cell_voltage_sensor_, max_cell_voltage - min_cell_voltage);
-      this->publish_state_(this->average_cell_voltage_sensor_, sum_cell_voltage / valid_cells);
+      this->publish_state_(this->cell_average_voltage_sensor_, sum_cell_voltage / valid_cells);
     }
 
   } else if (byte_count == 0x2A) {  // 42 bytes = 21 registers (temps, SOC, SOH, status, etc.)
