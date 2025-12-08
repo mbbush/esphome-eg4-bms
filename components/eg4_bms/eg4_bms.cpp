@@ -238,14 +238,17 @@ void EG4Bms::on_status_data_(const std::vector<uint8_t> &data) {
     // Warnings (register 0x001A)
     uint16_t warnings = get_16bit(16);
     this->publish_state_(this->warnings_text_sensor_, this->decode_warnings_(warnings));
+    this->publish_state_(this->warnings_bitmask_sensor_, (float) warnings);
 
     // Protection (register 0x001B)
     uint16_t protection = get_16bit(18);
     this->publish_state_(this->protection_text_sensor_, this->decode_protection_(protection));
+    this->publish_state_(this->protection_bitmask_sensor_, (float) protection);
 
     // Error (register 0x001C)
     uint16_t error = get_16bit(20);
     this->publish_state_(this->error_text_sensor_, this->decode_error_(error));
+    this->publish_state_(this->errors_bitmask_sensor_, (float) error);
 
     // Cycle count (registers 0x001D-0x001E) - 32-bit
     uint32_t cycle_count = get_32bit(22);

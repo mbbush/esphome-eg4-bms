@@ -69,6 +69,15 @@ class EG4Bms : public PollingComponent, public eg4_modbus::EG4ModbusDevice {
   }
   void set_cell_count_sensor(sensor::Sensor *cell_count) { cell_count_sensor_ = cell_count; }
 
+  // Bitmask sensors
+  void set_errors_bitmask_sensor(sensor::Sensor *errors_bitmask) { errors_bitmask_sensor_ = errors_bitmask; }
+  void set_warnings_bitmask_sensor(sensor::Sensor *warnings_bitmask) {
+    warnings_bitmask_sensor_ = warnings_bitmask;
+  }
+  void set_protection_bitmask_sensor(sensor::Sensor *protection_bitmask) {
+    protection_bitmask_sensor_ = protection_bitmask;
+  }
+
   // Text sensors
   void set_status_text_sensor(text_sensor::TextSensor *status) { status_text_sensor_ = status; }
   void set_warnings_text_sensor(text_sensor::TextSensor *warnings) { warnings_text_sensor_ = warnings; }
@@ -120,6 +129,11 @@ class EG4Bms : public PollingComponent, public eg4_modbus::EG4ModbusDevice {
   sensor::Sensor *cycle_count_sensor_{nullptr};
   sensor::Sensor *max_charge_current_sensor_{nullptr};
   sensor::Sensor *cell_count_sensor_{nullptr};
+
+  // Bitmask sensors
+  sensor::Sensor *errors_bitmask_sensor_{nullptr};
+  sensor::Sensor *warnings_bitmask_sensor_{nullptr};
+  sensor::Sensor *protection_bitmask_sensor_{nullptr};
 
   // Text sensors
   text_sensor::TextSensor *status_text_sensor_{nullptr};

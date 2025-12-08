@@ -74,6 +74,11 @@ CONF_CYCLE_COUNT = "cycle_count"
 CONF_MAX_CHARGE_CURRENT = "max_charge_current"
 CONF_CELL_COUNT = "cell_count"
 
+# Bitmask sensors
+CONF_ERRORS_BITMASK = "errors_bitmask"
+CONF_WARNINGS_BITMASK = "warnings_bitmask"
+CONF_PROTECTION_BITMASK = "protection_bitmask"
+
 UNIT_AMPERE_HOURS = "Ah"
 
 CELL_VOLTAGE_SCHEMA = sensor.sensor_schema(
@@ -198,6 +203,19 @@ CONFIG_SCHEMA = EG4_BMS_COMPONENT_SCHEMA.extend(
         cv.Optional(CONF_CELL_COUNT): sensor.sensor_schema(
             accuracy_decimals=0,
         ),
+        # Bitmask sensors
+        cv.Optional(CONF_ERRORS_BITMASK): sensor.sensor_schema(
+            accuracy_decimals=0,
+            icon="mdi:alert-circle-outline",
+        ),
+        cv.Optional(CONF_WARNINGS_BITMASK): sensor.sensor_schema(
+            accuracy_decimals=0,
+            icon="mdi:alert-outline",
+        ),
+        cv.Optional(CONF_PROTECTION_BITMASK): sensor.sensor_schema(
+            accuracy_decimals=0,
+            icon="mdi:shield-alert-outline",
+        ),
     }
 )
 
@@ -302,3 +320,16 @@ async def to_code(config):
     if CONF_CELL_COUNT in config:
         sens = await sensor.new_sensor(config[CONF_CELL_COUNT])
         cg.add(hub.set_cell_count_sensor(sens))
+    
+    # Bitmask sensors
+    if CONF_ERRORS_BITMASK in config:
+        sens = await sensor.new_sensor(config[CONF_ERRORS_BITMASK])
+        cg.add(hub.set_errors_bitmask_sensor(sens))
+    
+    if CONF_WARNINGS_BITMASK in config:
+        sens = await sensor.new_sensor(config[CONF_WARNINGS_BITMASK])
+        cg.add(hub.set_warnings_bitmask_sensor(sens))
+    
+    if CONF_PROTECTION_BITMASK in config:
+        sens = await sensor.new_sensor(config[CONF_PROTECTION_BITMASK])
+        cg.add(hub.set_protection_bitmask_sensor(sens))
