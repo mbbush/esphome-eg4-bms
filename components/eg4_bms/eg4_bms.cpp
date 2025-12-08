@@ -225,6 +225,15 @@ void EG4Bms::on_status_data_(const std::vector<uint8_t> &data) {
     // Decode heating from status
     bool heating = (status & 0x8000) != 0;
     this->publish_state_(this->heating_binary_sensor_, heating);
+    
+    // Decode charging/discharging from status (lower 4 bits)
+    // The BMS reports actual charging/discharging state, not just "allowed"
+    uint8_t state = status & 0x000F;
+    bool charging = (state == 0x01) || (state == 0x08);  // Charging or Charging Limited
+    bool discharging = (state == 0x02);  // Discharging
+    
+    this->publish_state_(this->charging_binary_sensor_, charging);
+    this->publish_state_(this->discharging_binary_sensor_, discharging);
 
     // Warnings (register 0x001A)
     uint16_t warnings = get_16bit(16);
@@ -237,14 +246,6 @@ void EG4Bms::on_status_data_(const std::vector<uint8_t> &data) {
     // Error (register 0x001C)
     uint16_t error = get_16bit(20);
     this->publish_state_(this->error_text_sensor_, this->decode_error_(error));
-
-    // Charging/discharging allowed based on protection status
-    // If no protection events are active, charging and discharging are allowed
-    bool charging_allowed = (protection == 0) && (error == 0);
-    bool discharging_allowed = (protection == 0) && (error == 0);
-    
-    this->publish_state_(this->charging_binary_sensor_, charging_allowed);
-    this->publish_state_(this->discharging_binary_sensor_, discharging_allowed);
 
     // Cycle count (registers 0x001D-0x001E) - 32-bit
     uint32_t cycle_count = get_32bit(22);
