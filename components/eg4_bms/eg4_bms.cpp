@@ -259,7 +259,7 @@ void EG4Bms::on_status_data_(const std::vector<uint8_t> &data) {
     }
 
     // Full capacity (register 0x0025) - 0.1 Ah units
-    uint16_t full_capacity = get_16bit(26);
+    uint16_t full_capacity = get_16bit(38);  // (0x0025 - 0x0012) * 2 = 38
     this->publish_state_(this->full_capacity_sensor_, full_capacity * 0.1f);
 
   } else if (byte_count == 0x16) {  // 22 bytes = 11 registers (model)
