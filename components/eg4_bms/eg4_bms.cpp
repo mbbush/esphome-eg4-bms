@@ -253,6 +253,10 @@ void EG4Bms::on_status_data_(const std::vector<uint8_t> &data) {
     // Temperature sensors 1-6 (registers 0x0021-0x0023) - packed as bytes
     // Each register contains 2 temperature values in its high and low bytes
     if (byte_count >= 0x2A) {  // Make sure we have enough data
+      ESP_LOGW(TAG, "Temp sensor bytes at 0x0021-0x0023: [30]=%d [31]=%d [32]=%d [33]=%d [34]=%d [35]=%d (raw: 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X)",
+               (int8_t)payload[30], (int8_t)payload[31], (int8_t)payload[32], 
+               (int8_t)payload[33], (int8_t)payload[34], (int8_t)payload[35],
+               payload[30], payload[31], payload[32], payload[33], payload[34], payload[35]);
       this->publish_state_(this->temperatures_[0].temperature_sensor_, (float) (int8_t) payload[30]);  // Reg 0x0021 high byte
       this->publish_state_(this->temperatures_[1].temperature_sensor_, (float) (int8_t) payload[31]);  // Reg 0x0021 low byte
       this->publish_state_(this->temperatures_[2].temperature_sensor_, (float) (int8_t) payload[32]);  // Reg 0x0022 high byte
