@@ -168,6 +168,8 @@ void EG4Bms::on_status_data_(const std::vector<uint8_t> &data) {
     float max_cell_voltage = 0.0f;
     float sum_cell_voltage = 0.0f;
     uint8_t valid_cells = 0;
+    uint8_t min_cell_number = 0;
+    uint8_t max_cell_number = 0;
 
     for (uint8_t i = 0; i < 16; i++) {
       uint16_t cell_mv = get_16bit(4 + i * 2);
@@ -175,8 +177,14 @@ void EG4Bms::on_status_data_(const std::vector<uint8_t> &data) {
         float cell_voltage = cell_mv * 0.001f;
         this->publish_state_(this->cells_[i].cell_voltage_sensor_, cell_voltage);
         
-        if (cell_voltage < min_cell_voltage) min_cell_voltage = cell_voltage;
-        if (cell_voltage > max_cell_voltage) max_cell_voltage = cell_voltage;
+        if (cell_voltage < min_cell_voltage) {
+          min_cell_voltage = cell_voltage;
+          min_cell_number = i + 1;  // Cell numbers are 1-indexed
+        }
+        if (cell_voltage > max_cell_voltage) {
+          max_cell_voltage = cell_voltage;
+          max_cell_number = i + 1;  // Cell numbers are 1-indexed
+        }
         sum_cell_voltage += cell_voltage;
         valid_cells++;
       }
@@ -187,6 +195,8 @@ void EG4Bms::on_status_data_(const std::vector<uint8_t> &data) {
       this->publish_state_(this->max_cell_voltage_sensor_, max_cell_voltage);
       this->publish_state_(this->delta_cell_voltage_sensor_, max_cell_voltage - min_cell_voltage);
       this->publish_state_(this->cell_average_voltage_sensor_, sum_cell_voltage / valid_cells);
+      this->publish_state_(this->min_voltage_cell_sensor_, (float) min_cell_number);
+      this->publish_state_(this->max_voltage_cell_sensor_, (float) max_cell_number);
     }
 
   } else if (byte_count == 0x2A) {  // 42 bytes = 21 registers (temps, SOC, SOH, status, etc.)
