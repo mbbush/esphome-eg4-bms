@@ -282,19 +282,15 @@ void EG4Bms::on_status_data_(const std::vector<uint8_t> &data) {
     this->publish_state_(this->full_capacity_sensor_, full_capacity * 0.1f);
 
   } else if (byte_count == 0x16) {  // 22 bytes = 11 registers (model)
-    std::string model((char *) payload, 22);
-    // Trim null characters and whitespace
-    model.erase(model.find_last_not_of(" \0") + 1);
+    std::string model = this->extract_ascii_string_(payload, 22);
     this->publish_state_(this->model_text_sensor_, model);
 
   } else if (byte_count == 0x06) {  // 6 bytes = 3 registers (firmware version)
-    std::string firmware((char *) payload, 6);
-    firmware.erase(firmware.find_last_not_of(" \0") + 1);
+    std::string firmware = this->extract_ascii_string_(payload, 6);
     this->publish_state_(this->firmware_text_sensor_, firmware);
 
   } else if (byte_count == 0x10) {  // 16 bytes = 8 registers (serial number)
-    std::string serial((char *) payload, 16);
-    serial.erase(serial.find_last_not_of(" \0") + 1);
+    std::string serial = this->extract_ascii_string_(payload, 16);
     this->publish_state_(this->serial_number_text_sensor_, serial);
   }
 }
@@ -382,6 +378,30 @@ void EG4Bms::publish_state_(binary_sensor::BinarySensor *binary_sensor, const bo
   if (binary_sensor != nullptr) {
     binary_sensor->publish_state(state);
   }
+}
+
+std::string EG4Bms::extract_ascii_string_(const uint8_t *data, size_t length) {
+  std::string result;
+  result.reserve(length);
+  
+  for (size_t i = 0; i < length; i++) {
+    uint8_t c = data[i];
+    // Only accept printable ASCII characters (0x20-0x7E)
+    if (c >= 0x20 && c <= 0x7E) {
+      result += static_cast<char>(c);
+    } else if (c == 0x00) {
+      // Null terminator - stop here
+      break;
+    }
+    // Skip non-printable characters (including 0xFF)
+  }
+  
+  // Trim trailing spaces
+  while (!result.empty() && result.back() == ' ') {
+    result.pop_back();
+  }
+  
+  return result;
 }
 
 void EG4Bms::publish_state_(sensor::Sensor *sensor, float value) {

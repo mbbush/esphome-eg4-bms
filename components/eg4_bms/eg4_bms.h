@@ -176,6 +176,7 @@ class EG4Bms : public PollingComponent, public eg4_modbus::EG4ModbusDevice {
   void track_online_status_();
   void publish_device_unavailable_();
   
+  std::string extract_ascii_string_(const uint8_t *data, size_t length);
   std::string decode_status_(uint16_t status);
   std::string decode_warnings_(uint16_t warnings);
   std::string decode_protection_(uint16_t protection);
